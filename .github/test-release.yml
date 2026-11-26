@@ -1,0 +1,45 @@
+# Builds runsc for personal testing
+name: Test release
+
+"on":
+  push:
+    branches:
+      - test-release
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # To create the tag and release.
+    steps:
+    - name: Install make
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        sudo -E apt update && sudo -E apt install -y make
+
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Build
+      run: |
+        mkdir -p bin
+        make copy TARGETS=//:release DESTINATION=bin/
+        (cd bin && find . -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS)
+
+    - name: Publish prerelease
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        tag="test-${GITHUB_RUN_NUMBER}-$(git rev-parse --short HEAD)"
+        mapfile -t assets < <(find bin -type f)
+        gh release create "$tag" "${assets[@]}" \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$GITHUB_SHA" \
+          --title "Test build $tag" \
+          --notes "Built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA}." \
+          --prerelease
