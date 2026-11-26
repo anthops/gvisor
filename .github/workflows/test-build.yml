@@ -27,19 +27,22 @@ jobs:
 
     - name: Build
       run: |
-        mkdir -p bin
-        make copy TARGETS=//:release DESTINATION=bin/
-        (cd bin && find . -type f ! -name SHA256SUMS -exec sha256sum {} + > SHA256SUMS)
+        mkdir -p dist
+        make release-tarball DESTINATION=dist/
+        cd dist
+        for f in gvisor.tar.zstd gvisor.tar.bz2; do
+          sha512sum "$f" > "$f.sha512"
+        done
+        ls -l
 
-    - name: Publish prerelease
+    - name: Publish release
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         tag="test-${GITHUB_RUN_NUMBER}-$(git rev-parse --short HEAD)"
-        mapfile -t assets < <(find bin -type f)
-        gh release create "$tag" "${assets[@]}" \
+        gh release create "$tag" dist/* \
           --repo "$GITHUB_REPOSITORY" \
           --target "$GITHUB_SHA" \
           --title "Test build $tag" \
-          --notes "Built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA}." \
-          --prerelease
+          --notes "Built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA} for $(uname -m)." \
+          --latest
