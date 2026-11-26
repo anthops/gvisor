@@ -4,7 +4,7 @@ name: Test release
 "on":
   push:
     branches:
-      - test-release
+      - test-build
   workflow_dispatch:
 
 concurrency:
